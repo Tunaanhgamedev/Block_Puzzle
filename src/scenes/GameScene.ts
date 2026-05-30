@@ -47,6 +47,7 @@ export class GameScene extends Scene {
 
   // Game store unsubscribe function
   private unsubscribeStore!: () => void;
+  private gameEnded = false;
 
   public init(): void {
     const store = useGameStore.getState();
@@ -83,6 +84,8 @@ export class GameScene extends Scene {
 
     // Subscribe to Zustand store updates
     this.unsubscribeStore = useGameStore.subscribe((state) => {
+      if (this.gameEnded) return;
+
       this.hud.refresh();
       this.drawBoard(state.grid);
       
@@ -91,6 +94,7 @@ export class GameScene extends Scene {
 
       // Check Game Over
       if (state.isGameOver) {
+        this.gameEnded = true;
         this.endGame();
       }
     });
@@ -432,20 +436,23 @@ export class GameScene extends Scene {
       // 5. Line clearing check
       this.checkLineClears(newGrid);
 
-      // 6. Spawn more blocks if all 3 placed
-      const remaining = store.currentBlocks.filter(b => !b.placed);
-      if (remaining.length === 0) {
-        const nextBlocks = BlockSystem.generateTripleBlocks(store.activeMode);
-        store.setCurrentBlocks(nextBlocks);
-      }
+      // 6. Re-fetch fresh state AFTER all mutations above
+      const freshState = useGameStore.getState();
 
-      // 7. Check Game Over
-      this.checkGameOver(store.activeMode);
+      // 7. Spawn more blocks if all 3 placed
+      const remaining = freshState.currentBlocks.filter(b => !b.placed);
+      if (remaining.length === 0) {
+        const nextBlocks = BlockSystem.generateTripleBlocks(freshState.activeMode);
+        useGameStore.setState({ currentBlocks: nextBlocks });
+      }
 
       // 8. Decrement move counts
-      if (store.activeMode === 'challenge') {
-        store.decrementMoves();
+      if (freshState.activeMode === 'challenge') {
+        freshState.decrementMoves();
       }
+
+      // 9. Check Game Over (must use latest state after block spawn)
+      this.checkGameOver(freshState.activeMode);
 
       // Cleanup drag sprite
       this.activeDragBlock.destroy({ children: true });

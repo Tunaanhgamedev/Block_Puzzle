@@ -50,13 +50,13 @@ export class Button extends Container {
 
     // Interactions
     this.interactive = true;
+    this.eventMode = 'static';
     this.cursor = 'pointer';
 
     // Hover Animation
     this.on('pointerover', () => {
       SoundManager.playHover();
       gsap.to(this.scale, { x: 1.05, y: 1.05, duration: 0.2, ease: 'power1.out' });
-      gsap.to(this.bg, { alpha: 1, duration: 0.2 });
       this.bg.clear();
       this.bg.roundRect(-w / 2, -h / 2, w, h, 12);
       this.bg.fill({ color: bgColor, alpha: 0.95 });
@@ -71,12 +71,13 @@ export class Button extends Container {
       this.bg.stroke({ color: borderColor, width: 2, alpha: 0.8 });
     });
 
-    this.on('pointerdown', () => {
-      SoundManager.playClick();
+    this.on('pointerdown', (e) => {
+      e.stopPropagation();
       gsap.to(this.scale, { x: 0.95, y: 0.95, duration: 0.08 });
     });
 
-    this.on('pointerup', () => {
+    this.on('pointerup', (e) => {
+      e.stopPropagation();
       gsap.to(this.scale, { x: 1.05, y: 1.05, duration: 0.1 });
       this.onClickCallback();
     });
