@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { SaveSystem } from './SaveSystem';
+import { BlockSystem } from './BlockSystem';
 
 export type GameMode = 'classic' | 'timeAttack' | 'challenge' | 'hardcore';
 
@@ -375,10 +376,12 @@ export const useGameStore = create<GameState>((set, get) => {
 
     useShuffle: () => {
       if (get().shuffles <= 0) return false;
-      // We'll let BlockSystem generate 3 new blocks and set it in store,
-      // here we just decrement the shuffle count.
       const nextShuffles = get().shuffles - 1;
-      set({ shuffles: nextShuffles });
+      const newBlocks = BlockSystem.generateTripleBlocks(get().activeMode);
+      set({
+        shuffles: nextShuffles,
+        currentBlocks: newBlocks
+      });
       
       SaveSystem.savePowerups({
         hammers: get().hammers,

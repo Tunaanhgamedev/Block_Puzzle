@@ -633,12 +633,16 @@ export class GameScene extends Scene {
         SoundManager.playSkill();
         // Particle explosion on cell
         ParticleManager.getInstance().spawnExplosion(local.x, local.y, 0xfd6585, 20);
+        
+        // Re-fetch fresh state AFTER useHammer mutation
+        const freshState = useGameStore.getState();
+
         // Direct update board
-        this.drawBoard(store.grid);
+        this.drawBoard(freshState.grid);
         this.hud.refresh();
 
         // Check if removing block triggers any line clears (usually not, but we verify)
-        this.checkLineClears(store.grid);
+        this.checkLineClears(freshState.grid);
       }
     }
   }
