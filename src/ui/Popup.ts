@@ -12,13 +12,13 @@ export class Popup extends Container {
   constructor(title: string, width = 440, height = 600) {
     super();
 
-    this.interactive = true;
+    this.eventMode = 'static';
 
     // Full screen blocking backdrop (darkened overlay)
     this.bg = new Graphics();
     this.bg.rect(0, 0, 1000, 1500); // large size to cover
     this.bg.fill({ color: 0x020208, alpha: 0.75 });
-    this.bg.interactive = true;
+    this.bg.eventMode = 'static';
     this.addChild(this.bg);
 
     // Popup container (centered)

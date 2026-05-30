@@ -49,7 +49,7 @@ export class HUD extends Container {
     this.gemsText = new Text({ text: '💎 500', style: gemsStyle });
     this.gemsText.x = 25;
     this.gemsText.y = 55;
-    this.gemsText.interactive = true;
+    this.gemsText.eventMode = 'static';
     this.gemsText.cursor = 'pointer';
     this.gemsText.on('pointerdown', () => {
       // Clicking gems HUD opens the Shop popup

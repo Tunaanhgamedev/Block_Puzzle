@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle, Rectangle } from 'pixi.js';
 import { Scene, SceneManager } from '../core/SceneManager';
 import { Game } from '../core/Game';
 import { HUD } from '../ui/HUD';
@@ -38,6 +38,8 @@ export class GameScene extends Scene {
   private activeDragData: BlockData | null = null;
   private dragStartX = 0;
   private dragStartY = 0;
+  private dragFrameCounter = 0;
+  private cachedGrid: number[][] = [];
 
   // Highlights on grid during drag
   private highlightOverlay!: Graphics;
@@ -54,6 +56,8 @@ export class GameScene extends Scene {
 
     // Game layer (for shakes/zooms)
     this.gameLayer = new Container();
+    this.gameLayer.eventMode = 'static';
+    this.gameLayer.hitArea = new Rectangle(0, 0, 540, 960);
     this.addChild(this.gameLayer);
 
     // 1. HUD Layer
@@ -138,7 +142,7 @@ export class GameScene extends Scene {
         bg.stroke({ color: 0x1f1f4d, width: 1, alpha: 0.5 });
         bg.x = cx;
         bg.y = cy;
-        bg.interactive = true;
+        bg.eventMode = 'static';
         bg.cursor = 'pointer';
         
         // Register tap for skills (Hammer)
@@ -203,7 +207,7 @@ export class GameScene extends Scene {
       const blockHolder = new Container();
       blockHolder.x = startX + index * spacing;
       blockHolder.y = 0;
-      blockHolder.interactive = true;
+      blockHolder.eventMode = 'static';
       blockHolder.cursor = 'pointer';
 
       // Draw the block shape
@@ -264,6 +268,10 @@ export class GameScene extends Scene {
     this.activeDragData = blockData;
     this.dragStartX = originalHolder.x;
     this.dragStartY = originalHolder.y;
+    this.dragFrameCounter = 0;
+
+    // Cache grid state for the entire drag session (avoid re-reading store every move)
+    this.cachedGrid = store.grid;
 
     // Temporarily hide original holder
     originalHolder.visible = false;
@@ -276,13 +284,13 @@ export class GameScene extends Scene {
     const rows = shape.length;
     const cols = shape[0].length;
     const colorHex = BlockSystem.NEON_COLORS[blockData.color];
-    const blockSize = this.cellSize;
+    const cellSpacing = this.cellSize + this.cellGap;
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         if (shape[r][c] === 1) {
           const square = new Graphics();
-          square.roundRect(c * blockSize, r * blockSize, blockSize, blockSize, 8);
+          square.roundRect(c * cellSpacing, r * cellSpacing, this.cellSize, this.cellSize, 8);
           square.fill({ color: colorHex });
           square.stroke({ color: 0xffffff, width: 2, alpha: 0.7 });
           this.activeDragBlock.addChild(square);
@@ -290,8 +298,8 @@ export class GameScene extends Scene {
       }
     }
 
-    // Pivot center and position
-    this.activeDragBlock.pivot.set(cols * blockSize / 2, rows * blockSize / 2);
+    // Pivot center using cellSpacing for consistent grid alignment
+    this.activeDragBlock.pivot.set(cols * cellSpacing / 2, rows * cellSpacing / 2);
 
     // Apply offset so block floats slightly ABOVE finger/cursor
     const localPos = this.gameLayer.toLocal(event.global);
@@ -304,11 +312,12 @@ export class GameScene extends Scene {
 
     this.gameLayer.addChild(this.activeDragBlock);
 
-    // Listen to move/up globally
-    this.gameLayer.interactive = true;
-    this.gameLayer.on('pointermove', this.onDragMove, this);
-    this.gameLayer.on('pointerup', this.onDragEnd, this);
-    this.gameLayer.on('pointerupoutside', this.onDragEnd, this);
+    // Listen to move/up on the scene (covers entire screen)
+    this.eventMode = 'static';
+    this.hitArea = new Rectangle(0, 0, 540, 960);
+    this.on('pointermove', this.onDragMove, this);
+    this.on('pointerup', this.onDragEnd, this);
+    this.on('pointerupoutside', this.onDragEnd, this);
   }
 
   /**
@@ -321,8 +330,11 @@ export class GameScene extends Scene {
     this.activeDragBlock.x = localPos.x;
     this.activeDragBlock.y = localPos.y - 70; // offset
 
-    // Spawn sparkle trail particles
-    ParticleManager.getInstance().spawnTrail(this.activeDragBlock.x, this.activeDragBlock.y, BlockSystem.NEON_COLORS[this.activeDragData.color]);
+    // Throttle particle trail: only spawn every 3rd frame to reduce lag
+    this.dragFrameCounter++;
+    if (this.dragFrameCounter % 3 === 0) {
+      ParticleManager.getInstance().spawnTrail(this.activeDragBlock.x, this.activeDragBlock.y, BlockSystem.NEON_COLORS[this.activeDragData.color]);
+    }
 
     // Check overlay on grid board
     this.updateDragHighlight();
@@ -336,8 +348,9 @@ export class GameScene extends Scene {
 
     this.highlightOverlay.clear();
 
-    const store = useGameStore.getState();
-    const grid = store.grid;
+    const grid = this.cachedGrid;
+    if (!grid || grid.length === 0) return;
+
     const shape = this.activeDragData.shape;
 
     // Get position of the active block relative to board container
@@ -347,12 +360,11 @@ export class GameScene extends Scene {
     const cellSpacing = this.cellSize + this.cellGap;
     const offset = this.boardSizePx / 2;
 
-    // We align coordinate to pivot of dragging block, which is center.
-    // Let's compute grid indices based on top-left of shape:
+    // Compute grid indices based on top-left of shape using cellSpacing
     const blockRows = shape.length;
     const blockCols = shape[0].length;
-    const shapeWidth = blockCols * this.cellSize;
-    const shapeHeight = blockRows * this.cellSize;
+    const shapeWidth = blockCols * cellSpacing;
+    const shapeHeight = blockRows * cellSpacing;
 
     const topLeftX = boardPos.x - shapeWidth / 2;
     const topLeftY = boardPos.y - shapeHeight / 2;
@@ -389,9 +401,9 @@ export class GameScene extends Scene {
     if (!this.activeDragBlock || !this.activeDragData) return;
 
     // Remove event listeners
-    this.gameLayer.off('pointermove', this.onDragMove, this);
-    this.gameLayer.off('pointerup', this.onDragEnd, this);
-    this.gameLayer.off('pointerupoutside', this.onDragEnd, this);
+    this.off('pointermove', this.onDragMove, this);
+    this.off('pointerup', this.onDragEnd, this);
+    this.off('pointerupoutside', this.onDragEnd, this);
 
     this.highlightOverlay.clear();
 
@@ -405,8 +417,8 @@ export class GameScene extends Scene {
     const offset = this.boardSizePx / 2;
     const blockRows = shape.length;
     const blockCols = shape[0].length;
-    const shapeWidth = blockCols * this.cellSize;
-    const shapeHeight = blockRows * this.cellSize;
+    const shapeWidth = blockCols * cellSpacing;
+    const shapeHeight = blockRows * cellSpacing;
 
     const topLeftX = boardPos.x - shapeWidth / 2;
     const topLeftY = boardPos.y - shapeHeight / 2;
