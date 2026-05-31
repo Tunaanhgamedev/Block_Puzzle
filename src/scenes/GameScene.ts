@@ -40,6 +40,12 @@ export class GameScene extends Scene {
   private dragStartY = 0;
   private dragFrameCounter = 0;
   private cachedGrid: number[][] = [];
+  
+  // Rotate gesture detection
+  private isRotatePending = false;
+  private dragStartPos = { x: 0, y: 0 };
+  private pendingRotateIndex = 0;
+  private pendingOriginalHolder!: Container;
 
   // Highlights on grid during drag
   private highlightOverlay!: Graphics;
@@ -253,17 +259,12 @@ export class GameScene extends Scene {
   private onDragStart(event: any, blockData: BlockData, previewIndex: number, originalHolder: Container): void {
     const store = useGameStore.getState();
 
-    // 1. Check if Rotate skill is active
-    if (store.activeSkill === 'rotate') {
-      const success = store.useRotate(previewIndex);
-      if (success) {
-        SoundManager.playSkill();
-        this.renderPreviews();
-      }
-      return;
-    }
+    // Check if Rotate skill is active
+    this.isRotatePending = store.activeSkill === 'rotate';
+    this.dragStartPos = { x: event.global.x, y: event.global.y };
+    this.pendingRotateIndex = previewIndex;
+    this.pendingOriginalHolder = originalHolder;
 
-    // 2. Regular Drag & Drop
     SoundManager.playHover();
     
     this.activeDragData = blockData;
@@ -271,11 +272,8 @@ export class GameScene extends Scene {
     this.dragStartY = originalHolder.y;
     this.dragFrameCounter = 0;
 
-    // Cache grid state for the entire drag session (avoid re-reading store every move)
+    // Cache grid state for the entire drag session
     this.cachedGrid = store.grid;
-
-    // Temporarily hide original holder
-    originalHolder.visible = false;
 
     // Create a drag container at stage level
     this.activeDragBlock = new Container();
@@ -313,6 +311,13 @@ export class GameScene extends Scene {
 
     this.gameLayer.addChild(this.activeDragBlock);
 
+    // If rotating, keep original visible and hide preview drag block initially
+    if (this.isRotatePending) {
+      this.activeDragBlock.visible = false;
+    } else {
+      originalHolder.visible = false;
+    }
+
     // Listen to move/up on the scene (covers entire screen)
     this.eventMode = 'static';
     this.hitArea = new Rectangle(0, 0, 540, 960);
@@ -326,6 +331,22 @@ export class GameScene extends Scene {
    */
   private onDragMove(event: any): void {
     if (!this.activeDragBlock || !this.activeDragData) return;
+
+    if (this.isRotatePending) {
+      const dx = event.global.x - this.dragStartPos.x;
+      const dy = event.global.y - this.dragStartPos.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 15) {
+        // Dragged beyond threshold! Cancel rotate mode, show drag block, hide original
+        this.isRotatePending = false;
+        this.activeDragBlock.visible = true;
+        this.pendingOriginalHolder.visible = false;
+        useGameStore.getState().setActiveSkill(null);
+      } else {
+        // Still inside threshold, don't move or show drag block
+        return;
+      }
+    }
 
     const localPos = this.gameLayer.toLocal(event.global);
     this.activeDragBlock.x = localPos.x;
@@ -407,6 +428,22 @@ export class GameScene extends Scene {
     this.off('pointerupoutside', this.onDragEnd, this);
 
     this.highlightOverlay.clear();
+
+    if (this.isRotatePending) {
+      // It was a tap/click: clean up drag helper and execute rotate
+      this.isRotatePending = false;
+      this.activeDragBlock.destroy();
+      this.activeDragBlock = null;
+      this.activeDragData = null;
+      
+      const store = useGameStore.getState();
+      const success = store.useRotate(this.pendingRotateIndex);
+      if (success) {
+        SoundManager.playSkill();
+        this.renderPreviews();
+      }
+      return;
+    }
 
     const store = useGameStore.getState();
     const grid = store.grid;

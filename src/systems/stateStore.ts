@@ -59,6 +59,7 @@ export interface GameState {
   
   // Active tool
   activeSkill: 'hammer' | 'rotate' | null;
+  rotatedBlockIds: string[];
 
   // History for Undo
   undoHistory: Array<{
@@ -154,6 +155,7 @@ export const useGameStore = create<GameState>((set, get) => {
     undos: savedPowerups.undos,
     
     activeSkill: null,
+    rotatedBlockIds: [],
     undoHistory: [],
 
     initGame: (mode: GameMode) => {
@@ -175,6 +177,7 @@ export const useGameStore = create<GameState>((set, get) => {
         isPaused: false,
         activeSkill: null,
         undoHistory: [],
+        rotatedBlockIds: [],
       });
     },
 
@@ -225,7 +228,10 @@ export const useGameStore = create<GameState>((set, get) => {
       const updated = get().currentBlocks.map((b) =>
         b.id === id ? { ...b, placed: true } : b
       );
-      set({ currentBlocks: updated });
+      set({ 
+        currentBlocks: updated,
+        rotatedBlockIds: [], // Clear rotated block IDs when a block is placed
+      });
     },
 
     setCurrentBlocks: (blocks) => {
@@ -348,13 +354,21 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     useRotate: (index) => {
-      if (get().rotates <= 0) return false;
-      
       const blocks = [...get().currentBlocks];
       if (index < 0 || index >= blocks.length || blocks[index].placed) return false;
       
+      const block = blocks[index];
+      const isAlreadyRotated = get().rotatedBlockIds.includes(block.id);
+      
+      // If not already rotated this turn, check and deduct powerup
+      let nextRotates = get().rotates;
+      if (!isAlreadyRotated) {
+        if (get().rotates <= 0) return false;
+        nextRotates = get().rotates - 1;
+      }
+      
       // Rotate shape 90 degrees clockwise
-      const shape = blocks[index].shape;
+      const shape = block.shape;
       const rows = shape.length;
       const cols = shape[0].length;
       const rotated: number[][] = Array.from({ length: cols }, () => Array(rows).fill(0));
@@ -365,13 +379,17 @@ export const useGameStore = create<GameState>((set, get) => {
         }
       }
       
-      blocks[index] = { ...blocks[index], shape: rotated };
-      const nextRotates = get().rotates - 1;
+      blocks[index] = { ...block, shape: rotated };
+      
+      const newRotatedIds = isAlreadyRotated 
+        ? get().rotatedBlockIds 
+        : [...get().rotatedBlockIds, block.id];
       
       set({
         currentBlocks: blocks,
         rotates: nextRotates,
-        activeSkill: null
+        rotatedBlockIds: newRotatedIds
+        // Do NOT set activeSkill to null! Keep it active so they can continue rotating.
       });
 
       SaveSystem.savePowerups({
@@ -389,7 +407,8 @@ export const useGameStore = create<GameState>((set, get) => {
       const newBlocks = BlockSystem.generateTripleBlocks(get().activeMode);
       set({
         shuffles: nextShuffles,
-        currentBlocks: newBlocks
+        currentBlocks: newBlocks,
+        rotatedBlockIds: [] // Clear rotated IDs
       });
       
       SaveSystem.savePowerups({
@@ -416,7 +435,8 @@ export const useGameStore = create<GameState>((set, get) => {
         gems: previousState.gems,
         currentBlocks: previousState.currentBlocks,
         undoHistory: nextHistory,
-        undos: nextUndos
+        undos: nextUndos,
+        rotatedBlockIds: [] // Clear rotated IDs
       });
 
       SaveSystem.saveGems(previousState.gems);
