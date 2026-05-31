@@ -166,7 +166,7 @@ export const useGameStore = create<GameState>((set, get) => {
         activeMode: mode,
         gridSize: size,
         grid: initialGrid,
-        currentBlocks: [],
+        currentBlocks: BlockSystem.generateTripleBlocks(mode),
         movesLeft: mode === 'challenge' ? 15 : 0,
         linesCleared: 0,
         linesClearedTarget: mode === 'challenge' ? 20 : 0,
