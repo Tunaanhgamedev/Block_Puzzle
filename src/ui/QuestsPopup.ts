@@ -8,13 +8,13 @@ export class QuestsPopup extends Popup {
   private contentContainer!: Container;
 
   constructor() {
-    super('NHIỆM VỤ & THÀNH TỰU', 440, 640);
+    super('NHIỆM VỤ & THÀNH TỰU', 450, 760);
     this.createContent();
   }
 
   private createContent(): void {
     this.contentContainer = new Container();
-    this.contentContainer.y = -220;
+    this.contentContainer.y = -295;
     this.container.addChild(this.contentContainer);
     this.drawList();
   }

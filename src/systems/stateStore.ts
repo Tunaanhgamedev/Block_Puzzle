@@ -117,8 +117,17 @@ export const useGameStore = create<GameState>((set, get) => {
   const savedHighScores = SaveSystem.loadHighScores();
   const savedGems = SaveSystem.loadGems();
   const savedPowerups = SaveSystem.loadPowerups();
-  const savedQuests = SaveSystem.loadQuests() || DEFAULT_QUESTS;
-  const savedAchievements = SaveSystem.loadAchievements() || DEFAULT_ACHIEVEMENTS;
+  const rawSavedQuests = SaveSystem.loadQuests();
+  const quests = DEFAULT_QUESTS.map(defQ => {
+    const saved = rawSavedQuests?.find(sq => sq.id === defQ.id);
+    return saved ? { ...defQ, current: saved.current, completed: saved.completed } : defQ;
+  });
+
+  const rawSavedAchievements = SaveSystem.loadAchievements();
+  const achievements = DEFAULT_ACHIEVEMENTS.map(defA => {
+    const saved = rawSavedAchievements?.find(sa => sa.id === defA.id);
+    return saved ? { ...defA, current: saved.current, completed: saved.completed } : defA;
+  });
 
   return {
     score: 0,
@@ -136,8 +145,8 @@ export const useGameStore = create<GameState>((set, get) => {
     timeLeft: 180, // 3 mins default
     isGameOver: false,
     isPaused: false,
-    quests: savedQuests,
-    achievements: savedAchievements,
+    quests,
+    achievements,
     
     hammers: savedPowerups.hammers,
     rotates: savedPowerups.rotates,

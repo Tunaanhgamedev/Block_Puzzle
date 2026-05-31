@@ -1,6 +1,7 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { Button } from './Button';
 import { SoundManager } from '../systems/SoundManager';
+import { SceneManager } from '../core/SceneManager';
 import { gsap } from 'gsap';
 
 export class Popup extends Container {
@@ -62,7 +63,7 @@ export class Popup extends Container {
 
   public show(parent: Container): void {
     parent.addChild(this);
-    this.resize(window.innerWidth, window.innerHeight);
+    this.resize(SceneManager.getWidth(), SceneManager.getHeight());
 
     // Pop-in animation
     this.container.scale.set(0);

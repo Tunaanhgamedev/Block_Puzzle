@@ -157,6 +157,7 @@ export class GameScene extends Scene {
         block.x = cx;
         block.y = cy;
         block.visible = false;
+        block.eventMode = 'none';
         this.boardContainer.addChild(block);
 
         this.cells[r][c] = { bg, block };

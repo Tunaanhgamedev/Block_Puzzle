@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { ShopPopup } from '../ui/ShopPopup';
 import { QuestsPopup } from '../ui/QuestsPopup';
 import { LeaderboardPopup } from '../ui/LeaderboardPopup';
+import { HowToPlayPopup } from '../ui/HowToPlayPopup';
 import { useGameStore, GameMode } from '../systems/stateStore';
 import { SoundManager } from '../systems/SoundManager';
 import { TweenManager } from '../effects/TweenManager';
@@ -23,6 +24,7 @@ export class MenuScene extends Scene {
   private questsBtn!: Button;
   private leaderBtn!: Button;
   private soundBtn!: Button;
+  private guideBtn!: Button;
 
   public init(): void {
     // 1. Neon Game Title
@@ -115,15 +117,28 @@ export class MenuScene extends Scene {
     // Sound toggle
     this.soundBtn = new Button({
       text: '🔊 ÂM THANH: BẬT',
-      width: 130,
-      height: 36,
-      fontSize: 10,
+      width: 150,
+      height: 38,
+      fontSize: 11,
       bgColor: 0x0e0e22,
       borderColor: 0x555577,
       glowColor: 0xffffff,
       onClick: () => this.toggleSound(),
     });
     this.addChild(this.soundBtn);
+
+    // Guide Button
+    this.guideBtn = new Button({
+      text: '❓ HƯỚNG DẪN',
+      width: 150,
+      height: 38,
+      fontSize: 11,
+      bgColor: 0x0e0e22,
+      borderColor: 0x00f2fe,
+      glowColor: 0x00f2fe,
+      onClick: () => new HowToPlayPopup().show(this),
+    });
+    this.addChild(this.guideBtn);
 
     // Update sound button label based on initial state
     this.updateSoundButton();
@@ -244,17 +259,22 @@ export class MenuScene extends Scene {
     this.playBtn.y = height - 190;
 
     // Footer buttons layout
+    // Row 1 (y = height - 120): Shop, Quests, Leaderboard
     this.questsBtn.x = width / 2;
-    this.questsBtn.y = height - 100;
+    this.questsBtn.y = height - 120;
 
     this.shopBtn.x = width / 2 - 130;
-    this.shopBtn.y = height - 100;
+    this.shopBtn.y = height - 120;
 
     this.leaderBtn.x = width / 2 + 130;
-    this.leaderBtn.y = height - 100;
+    this.leaderBtn.y = height - 120;
 
-    this.soundBtn.x = width / 2;
-    this.soundBtn.y = height - 40;
+    // Row 2 (y = height - 60): Guide and Sound
+    this.guideBtn.x = width / 2 - 90;
+    this.guideBtn.y = height - 65;
+
+    this.soundBtn.x = width / 2 + 90;
+    this.soundBtn.y = height - 65;
   }
 
   public destroyScene(): void {
